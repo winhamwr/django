@@ -71,6 +71,12 @@ class BaseDatabaseWrapper(local):
             return
         self.cursor().execute(self.ops.savepoint_commit_sql(sid))
 
+    def begin_defer_constraint_checks(self):
+        return None
+
+    def end_defer_constraint_checks(self):
+        return None
+
     def close(self):
         if self.connection is not None:
             self.connection.close()

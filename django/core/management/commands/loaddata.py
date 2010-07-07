@@ -76,6 +76,8 @@ class Command(BaseCommand):
         if has_bz2:
             compression_types['bz2'] = bz2.BZ2File
 
+        connection.begin_defer_constraint_checks()
+
         app_module_paths = []
         for app in get_apps():
             if hasattr(app, '__path__'):
@@ -113,6 +115,7 @@ class Command(BaseCommand):
                 sys.stderr.write(
                     self.style.ERROR("Problem installing fixture '%s': %s is not a known serialization format." %
                         (fixture_name, format)))
+                connection.end_defer_constraint_checks()
                 transaction.rollback()
                 transaction.leave_transaction_management()
                 return
@@ -129,23 +132,24 @@ class Command(BaseCommand):
                 label_found = False
                 for format in formats:
                     for compression_format in compression_formats:
-                        if compression_format: 
-                            file_name = '.'.join([fixture_name, format, 
+                        if compression_format:
+                            file_name = '.'.join([fixture_name, format,
                                                   compression_format])
-                        else: 
+                        else:
                             file_name = '.'.join([fixture_name, format])
-                    
+
                         if verbosity > 1:
                             print "Trying %s for %s fixture '%s'..." % \
                                 (humanize(fixture_dir), file_name, fixture_name)
                         full_path = os.path.join(fixture_dir, file_name)
-                        open_method = compression_types[compression_format]                                
-                        try: 
+                        open_method = compression_types[compression_format]
+                        try:
                             fixture = open_method(full_path, 'r')
                             if label_found:
                                 fixture.close()
                                 print self.style.ERROR("Multiple fixtures named '%s' in %s. Aborting." %
                                     (fixture_name, humanize(fixture_dir)))
+                                connection.end_defer_constraint_checks()
                                 transaction.rollback()
                                 transaction.leave_transaction_management()
                                 return
@@ -168,6 +172,7 @@ class Command(BaseCommand):
                                 except Exception:
                                     import traceback
                                     fixture.close()
+                                    connection.end_defer_constraint_checks()
                                     transaction.rollback()
                                     transaction.leave_transaction_management()
                                     if show_traceback:
@@ -175,8 +180,8 @@ class Command(BaseCommand):
                                     else:
                                         sys.stderr.write(
                                             self.style.ERROR("Problem installing fixture '%s': %s\n" %
-                                                 (full_path, ''.join(traceback.format_exception(sys.exc_type, 
-                                                     sys.exc_value, sys.exc_traceback))))) 
+                                                 (full_path, ''.join(traceback.format_exception(sys.exc_type,
+                                                     sys.exc_value, sys.exc_traceback)))))
                                     return
                                 fixture.close()
 
@@ -186,6 +191,7 @@ class Command(BaseCommand):
                                     sys.stderr.write(
                                         self.style.ERROR("No fixture data found for '%s'. (File format may be invalid.)" %
                                             (fixture_name)))
+                                    connection.end_defer_constraint_checks()
                                     transaction.rollback()
                                     transaction.leave_transaction_management()
                                     return
@@ -205,6 +211,7 @@ class Command(BaseCommand):
                 for line in sequence_sql:
                     cursor.execute(line)
 
+        connection.end_defer_constraint_checks()
         if commit:
             transaction.commit()
             transaction.leave_transaction_management()
